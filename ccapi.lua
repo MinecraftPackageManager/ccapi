@@ -27,7 +27,6 @@ if ccapi_DebugKernel then
   M.debug = true
 end
 
-local simplecopy
 do
   local type,rawset,next = type,rawset,next
   local function check(obj, todo, copies)
@@ -41,9 +40,9 @@ do
     end
     return obj
   end
-  simplecopy = function(inp, copies)
+  M.simplecopy = function(inp)
     local out, todo = {}, {}
-    copies = copies or {}
+    local copies = {}
     todo[inp], copies[inp] = out, out
 
     -- we can't use pairs() here because we modify todo
@@ -137,17 +136,17 @@ M.prepareEnv = function(ccEnv, eventQueue)
     local path = x
     path = path:gsub("?","ccapi"):gsub("ccapi.lua","kernel.lua")
     local f,e = loadfile(path)
-    if M.debug then
-      print(f,e)
-    end
     if f then
       local s,e = pcall(f, M, path)
-      if M.debug then
-        print(s,e)
-      end
       if s then
         break
       end
+      if M.debug and (e or not s) then
+        print(s,e)
+      end
+    end
+    if M.debug and (e or not f) then
+      print(f,e)
     end
   end
 
@@ -155,13 +154,10 @@ M.prepareEnv = function(ccEnv, eventQueue)
   return ccEnv, eventQueue
 end
 
-local ccEnv,eventQueue = simplecopy(_G),{}
-M.prepareEnv(ccEnv, eventQueue)
-
 function M.runCC(func, env, eventQueue, id)
   if env then
     setfenv(func, env)
-    env, eventQueue = M.prepareEnv(env or simplecopy(_G), eventQueue or {})
+    env, eventQueue = M.prepareEnv(env or M.simplecopy(_G), eventQueue or {})
   end
   if not eventQueue then eventQueue = {} end
   -- main loop
