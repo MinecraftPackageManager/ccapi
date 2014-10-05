@@ -16,6 +16,8 @@
     along with CCAPI.  If not, see <http://www.gnu.org/licenses/>.
   ]]
 
+-- This file is like CC's bios.lua but better...
+
 local M, path = ...
 
 if not M then print("Use ccapi") return end
@@ -25,7 +27,8 @@ print("Loading CCAPI kernel!")
 if M.debug then
   local debugstring = [[
   
-    CCAPI Version: ${CC};
+    CC Version: ${CC};
+    CCAPI Version: ${API};
     Lua Version: ${LUA};
     -- TODO add more info
     ]]
@@ -33,7 +36,8 @@ if M.debug then
         "${(.-)}",
         {
           LUA = _VERSION,
-          CC = M.version,
+          CC = M.ccversion,
+          API = M.version,
         }
       )))
 end

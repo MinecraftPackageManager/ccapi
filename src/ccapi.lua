@@ -16,9 +16,14 @@
     along with CCAPI.  If not, see <http://www.gnu.org/licenses/>.
   ]]
 
+local lfs = require("lfs")
+
+local modname = ...
+
 local M = {
   util={},
-  version="CraftOS 1.63"
+  ccversion="CraftOS 1.63",
+  version="CCAPI 0.0.0",
 }
 
 if ccapi_DebugKernel then
@@ -67,15 +72,21 @@ do
   end
 end
 
--- Prepare a _G clone
+-- Prepare basic env
 M.prepareEnv = function(ccEnv, eventQueue)
   local select,type,error = select,type,error
   local setfenv,getfenv = setfenv,getfenv
   local cyield = coroutine.yield
 
   local luapath = package.path
-  local dirsep = package.config:match("^([^\n]*)") -- 1st line
-  local pathsep = package.config:match("^[^\n]*\n([^\n]*)") -- 2nd line
+  local pc = {} -- pc = "package config"
+  -- ds = "directory separator"
+  -- ps = "path separator"
+  -- np = "name point"
+  -- ed = "executable directory"
+  -- im = "ignore mark"
+  pc.ds,pc.ps,pc.np,pc.ed,pc.im = package.config:match("^([^\n]*)\n([^\n]*)\n([^\n]*)\n([^\n]*)\n([^\n]*)")
+
 
   -- make it so every new function has ccEnv as the env
   setfenv(1,ccEnv)
@@ -98,16 +109,6 @@ M.prepareEnv = function(ccEnv, eventQueue)
     end
   end
 
-  ccEnv.getfenv = function(f)
-    if getfenv(f) == getfenv(0) then
-      return ccEnv
-    elseif type(f) == "number" then
-      return getfenv(f+1)
-    else
-      return getfenv(f)
-    end
-  end
-
   if not ccEnv.os then
     ccEnv.os = {}
   end
@@ -121,6 +122,7 @@ M.prepareEnv = function(ccEnv, eventQueue)
 
   do
     -- No I'm not gonna take 5 parameters like a fucking PEASANT!
+    -- TAKE THAT, COMPUTERCRAFT!
     local function parseEvent(evt, ...)
       if evt == "terminate" then
         error("Terminated")
@@ -132,37 +134,47 @@ M.prepareEnv = function(ccEnv, eventQueue)
     end
   end
 
-  for x in luapath:gmatch("([^" .. pathsep .. "]+)") do
-    local path = x
-    path = path:gsub("?","ccapi"):gsub("ccapi.lua","kernel.lua")
-    local f,e = loadfile(path)
-    if f then
-      local s,e = pcall(f, M, path)
-      if s then
-        break
-      end
-      if M.debug and (e or not s) then
-        print(s,e)
-      end
-    end
-    if M.debug and (e or not f) then
-      print(f,e)
-    end
-  end
-
   setfenv(1,getfenv(0))
-  return ccEnv, eventQueue
+
+  return ccEnv, eventQueue,function()
+    setfenv(1,ccEnv)
+
+    -- TODO properly
+    for x in luapath:gmatch("([^" .. pc.ps .. "]+)") do
+      local path = x:gsub("%" .. pc.np, (modname:gsub("%.", pc.ds))):gsub("^%./", assert(lfs.currentdir()):gsub("%%","%%%%") .. "/")
+      local f,e = io.open(path,"r")
+      if f then
+        f:close()
+        local p1, p2 = path:match("(.*)" .. pc.ds .. "(.*)$")
+        path = p1 .. p2:gsub(modname:match("%.?([^%.]*)$"),"kernel")
+        local f,e = loadfile(path)
+        if f then
+          local s,e = pcall(f, M, path)
+          if s then
+            break
+          end
+          if M.debug and (e or not s) then
+            print(s,e)
+          end
+        end
+        if M.debug and (e or not f) then
+          print(f,e)
+        end
+      end
+      if M.debug and (e or not f) then
+        print(f,e)
+      end
+    end
+
+    setfenv(1,getfenv(0))
+  end
 end
 
 function M.runCC(func, env, eventQueue, id)
-  if env then
-    setfenv(func, env)
-    env, eventQueue = M.prepareEnv(env or M.simplecopy(_G), eventQueue or {})
-  end
-  if not eventQueue then eventQueue = {} end
+  local env, eventQueue, loadkernel = M.prepareEnv(env or M.simplecopy(_G), eventQueue or {})
   -- main loop
   while true do
-
+    -- TODO
   end
 end
 

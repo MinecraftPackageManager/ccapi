@@ -19,4 +19,5 @@
 ccapi_DebugKernel = true -- enable CCAPI debug mode
 local ccapi = require("ccapi")
 
-local ccEnv, eventQueue = ccapi.prepareEnv(ccapi.simplecopy(_G), {})
+local ccEnv, eventQueue, loadkernel = ccapi.prepareEnv(ccapi.simplecopy(_G), {})
+loadkernel()
