@@ -73,7 +73,7 @@ do -- START Serpent
 
   local function s(t, opts)
     local name, indent, fatal, maxnum = opts.name, opts.indent, opts.fatal, opts.maxnum
-    local sparse, custom, huge = opts.sparse, opts.custom, not opts.nohuge
+    local sparse, custom, huge, selfreturn = opts.sparse, opts.custom, not opts.nohuge, not opts.noreturn
     local space, maxl = (opts.compact and '' or ' '), (opts.maxlevel or math.huge)
     local iname, comm = '_'..(name or ''), opts.comment and (tonumber(opts.comment) or math.huge)
     local seen, sref, syms, symn = {}, {'local '..iname..'={}'}, {}, 0
@@ -208,13 +208,24 @@ do -- START Serpent
     local warn = opts.comment and #sref>1 and space.."--[[incomplete output with shared/self-references skipped]]" or ''
     -- self-calling anonymous function :P
     -- AKA CC compat
-    return not name and body..warn or "(function() local "..body..sepr..tail.."return "..name..sepr.."end)()"
+    return not name and body..warn or ((selfreturn and "return" or "").."(function() local "..body..sepr..tail.."return "..name..sepr.."end)()")
   end
 
   local function deserialize(data, opts)
     local env = G
-    if opts and not (opts.safe == false) then
-      env = {}
+    local nocall = false
+    if not opts or opts.safe ~= false then
+      nocall = true
+      env = setmetatable({}, {
+          __index = function(t,k)
+            return t
+          end,
+          __call = function(t,...)
+            if nocall then
+              error("cannot call functions")
+            end -- else do nothing
+          end
+        })
     end
     local f, res = (loadstring or load)('return '..data, nil, nil, env)
     if not f then
@@ -226,7 +237,11 @@ do -- START Serpent
     if setfenv then
       setfenv(f, env)
     end
-    return pcall(f)
+    local function stuff(...)
+      nocall = false
+      return ...
+    end
+    return stuff(pcall(f))
   end
 
   local function merge(a, b)
@@ -246,7 +261,7 @@ do -- START Serpent
     block = function(a, opts) return s(a, merge({indent = '  ', sortkeys = true, comment = true}, opts)) end
   } --]]
 
-end
+end -- END serpent
 
 serialize = function(t)
   return serpent.serialize(t,{
@@ -254,7 +269,8 @@ serialize = function(t)
       sortkeys = true,
       comment = true,
       nocode = true,
-      name = 't'
+      name = 't',
+      noreturn = true
     })
 end
 
